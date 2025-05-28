@@ -12,7 +12,8 @@ export default function Sidebar() {
         <li><Link to="/ingreso" className={linkClass('/ingreso')}>Ingresar Productos</Link></li>
         <li><Link to="/stock" className={linkClass('/stock')}>Ver Stock</Link></li>
         <li><Link to="/ventas" className={linkClass('/ventas')}>Ventas</Link></li>
-        <li><Link to="/registro" className={linkClass('/registro')}>Registro de Movimientos</Link></li>        
+        <li><Link to="/registro" className={linkClass('/registro')}>Registro de Movimientos</Link></li> 
+        <li><Link to="/historial-ventas" className={linkClass('/historial-ventas')}>Historial Ventas</Link></li>
       </ul>
     </nav>
   )

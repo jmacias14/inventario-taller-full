@@ -6,6 +6,7 @@ import Stock from './pages/Stock'
 import Ventas from './pages/Ventas'
 import Ingreso from './pages/Ingreso'
 import Registro from './pages/Registro'
+import HistorialVentas from "./pages/HistorialVentas";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
               <Route path="/stock" element={<Stock />} />
               <Route path="/ventas" element={<Ventas />} />
               <Route path="/registro" element={<Registro />} />
+              <Route path="/historial-ventas" element={<HistorialVentas />} />
             </Routes>
           </main>
         </div>

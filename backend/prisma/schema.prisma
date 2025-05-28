@@ -19,7 +19,8 @@ model Producto {
   unidad        String
   observaciones String?
 
-  movimientos   Movimiento[] // Relación con el historial
+  movimientos   Movimiento[]
+  saleItems     SaleItem[]
 }
 
 model Movimiento {
@@ -30,4 +31,21 @@ model Movimiento {
   timestamp  DateTime  @default(now())
 
   producto   Producto  @relation(fields: [productoId], references: [id])
+}
+
+model Sale {
+  id          Int        @id @default(autoincrement())
+  createdAt   DateTime   @default(now())
+  comentarios String?
+  items       SaleItem[]
+}
+
+model SaleItem {
+  id        Int      @id @default(autoincrement())
+  saleId    Int
+  productId Int
+  cantidad  Int
+
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  product   Producto @relation(fields: [productId], references: [id])
 }

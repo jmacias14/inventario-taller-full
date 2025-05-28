@@ -1,10 +1,10 @@
-// src/pages/Ventas.jsx
 import { useEffect, useState } from 'react'
 import { useVentaStore } from '../store/ventaStore'
 import axios from 'axios'
 
 export default function Ventas() {
-  const { venta, quitarProducto, reiniciarVenta, finalizarVenta } = useVentaStore()
+  const { venta, quitarProducto, reiniciarVenta } = useVentaStore()
+  const [comentarios, setComentarios] = useState('')
   const [mensaje, setMensaje] = useState(null)
 
   useEffect(() => {
@@ -22,9 +22,18 @@ export default function Ventas() {
     }
 
     try {
-      const items = venta.map(p => ({ id: p.id, cantidad: p.cantidadSeleccionada || p.cantidad || 1 }))
-      await axios.post('http://localhost:3001/sales', { items })
+      const productos = venta.map(p => ({
+        productId: p.id,
+        cantidad: p.cantidadSeleccionada || p.cantidad || 1
+      }))
+
+      await axios.post('http://localhost:3001/sales', {
+        comentarios,
+        productos
+      })
+
       reiniciarVenta()
+      setComentarios('')
       setMensaje('Venta finalizada y stock actualizado.')
     } catch (err) {
       console.error(err)
@@ -36,6 +45,7 @@ export default function Ventas() {
     const confirmar = window.confirm('¿Estás seguro de que querés reiniciar la venta? Se perderán los productos agregados.')
     if (confirmar) {
       reiniciarVenta()
+      setComentarios('')
       setMensaje('Venta reiniciada.')
     } else {
       setMensaje('Operación cancelada: la venta no fue reiniciada.')
@@ -61,6 +71,19 @@ export default function Ventas() {
               <button onClick={() => quitarProducto(prod.id)} className="text-red-600 hover:underline">Quitar</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {venta.length > 0 && (
+        <div className="mt-4">
+          <label className="block font-semibold mb-1">Comentarios:</label>
+          <textarea
+            className="w-full border rounded p-2"
+            value={comentarios}
+            onChange={(e) => setComentarios(e.target.value)}
+            rows={3}
+            placeholder="Comentarios sobre la venta..."
+          />
         </div>
       )}
 
