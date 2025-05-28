@@ -40,7 +40,8 @@ router.post('/', async (req, res) => {
           data: {
             tipo: 'egreso',
             productoId: p.productId,
-            cantidad: p.cantidad
+            cantidad: p.cantidad,
+            ventaId: venta.id
           }
         })
       )
@@ -74,6 +75,7 @@ router.get('/history', async (req, res) => {
       fecha: venta.createdAt,
       comentarios: venta.comentarios,
       productos: venta.items.map((item) => ({
+        id: item.product.id,
         nombre: item.product.nombre,
         cantidad: item.cantidad,
         marca: item.product.marca
@@ -84,6 +86,43 @@ router.get('/history', async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error al obtener historial de ventas' })
+  }
+})
+
+// Anular venta (eliminar y restaurar stock)
+router.delete('/:id', async (req, res) => {
+  const ventaId = parseInt(req.params.id)
+
+  try {
+    const venta = await prisma.sale.findUnique({
+      where: { id: ventaId },
+      include: {
+        items: true
+      }
+    })
+
+    if (!venta) {
+      return res.status(404).json({ error: 'Venta no encontrada' })
+    }
+
+    const updates = venta.items.map(item =>
+      prisma.producto.update({
+        where: { id: item.productId },
+        data: { cantidad: { increment: item.cantidad } }
+      })
+    )
+
+    await prisma.$transaction([
+      ...updates,
+      prisma.movimiento.deleteMany({ where: { ventaId } }),
+      prisma.saleItem.deleteMany({ where: { saleId: ventaId } }),
+      prisma.sale.delete({ where: { id: ventaId } })
+    ])
+
+    res.json({ mensaje: 'Venta anulada, stock restaurado y movimientos eliminados' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al anular la venta' })
   }
 })
 

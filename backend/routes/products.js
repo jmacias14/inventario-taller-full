@@ -122,4 +122,25 @@ router.delete('/delete-all', async (req, res) => {
   }
 })
 
+// Obtener producto por ID
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const producto = await prisma.producto.findUnique({
+      where: { id }
+    })
+
+    if (!producto) {
+      return res.status(404).json({ error: 'Producto no encontrado' })
+    }
+
+    res.json(producto)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al obtener el producto' })
+  }
+})
+
+
 export default router
+

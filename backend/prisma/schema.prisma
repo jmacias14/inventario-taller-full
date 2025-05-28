@@ -8,8 +8,8 @@ datasource db {
 }
 
 model Producto {
-  id            Int          @id @default(autoincrement())
-  sku           String?      @unique
+  id            Int           @id @default(autoincrement())
+  sku           String?       @unique
   marca         String
   descripcion   String
   ubicacion     String
@@ -25,19 +25,22 @@ model Producto {
 
 model Movimiento {
   id         Int       @id @default(autoincrement())
-  tipo       String    // 'ingreso' o 'egreso'
+  tipo       String
   productoId Int
   cantidad   Float
   timestamp  DateTime  @default(now())
+  ventaId    Int?
 
   producto   Producto  @relation(fields: [productoId], references: [id])
+  venta      Sale?     @relation(fields: [ventaId], references: [id])
 }
 
 model Sale {
-  id          Int        @id @default(autoincrement())
-  createdAt   DateTime   @default(now())
+  id          Int          @id @default(autoincrement())
+  createdAt   DateTime     @default(now())
   comentarios String?
   items       SaleItem[]
+  movimientos Movimiento[]
 }
 
 model SaleItem {
