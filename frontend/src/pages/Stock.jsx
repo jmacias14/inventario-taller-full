@@ -15,33 +15,27 @@ export default function Stock() {
   const [estantesDisponibles, setEstantesDisponibles] = useState([])
   const [modal, setModal] = useState(null)
   const [cantidadVenta, setCantidadVenta] = useState(1)
+  const [productoParaBorrar, setProductoParaBorrar] = useState(null)
+  const [productoParaEditar, setProductoParaEditar] = useState(null)
+  const [cantidadEditar, setCantidadEditar] = useState('')
   const { agregarProducto } = useVentaStore()
   const LIMITE = 50
 
   useEffect(() => {
     fetch('/config/ubicacion.config.json')
-      .then(res => {
-        if (!res.ok) throw new Error('No se pudo cargar el archivo de configuración')
-        return res.json()
-      })
-      .then(data => setUbicacionConfig(data))
-      .catch(err => console.error('Error cargando configuración:', err))
+      .then(res => res.ok ? res.json() : Promise.reject('No se pudo cargar configuración'))
+      .then(setUbicacionConfig)
+      .catch(err => console.error(err))
   }, [])
 
   useEffect(() => {
-    if (filtros.repisa && ubicacionConfig[filtros.repisa]) {
-      setEstantesDisponibles(ubicacionConfig[filtros.repisa])
-    } else {
-      setEstantesDisponibles([])
-    }
+    setEstantesDisponibles(filtros.repisa && ubicacionConfig[filtros.repisa] ? ubicacionConfig[filtros.repisa] : [])
   }, [filtros.repisa, ubicacionConfig])
 
   const fetchProductos = async () => {
     try {
       const params = new URLSearchParams()
-      Object.entries(filtros).forEach(([key, val]) => {
-        if (val) params.append(key, val)
-      })
+      Object.entries(filtros).forEach(([key, val]) => val && params.append(key, val))
       params.append('skip', (pagina - 1) * LIMITE)
       params.append('take', LIMITE)
 
@@ -60,11 +54,7 @@ export default function Stock() {
 
   const handleChange = e => {
     const { name, value } = e.target
-    setFiltros(prev => ({
-      ...prev,
-      [name]: value,
-      ...(name === 'repisa' ? { estante: '' } : {})
-    }))
+    setFiltros(prev => ({ ...prev, [name]: value, ...(name === 'repisa' ? { estante: '' } : {}) }))
   }
 
   const handleBuscar = e => {
@@ -73,7 +63,9 @@ export default function Stock() {
     fetchProductos()
   }
 
-  const toggleExpand = id => setExpandido(prev => prev === id ? null : id)
+  const toggleExpand = (id) => {
+    setExpandido(prev => prev === id ? null : id)
+  }
 
   const abrirModalVenta = (producto) => {
     setModal(producto)
@@ -90,6 +82,50 @@ export default function Stock() {
     }
   }
 
+  const pluralizar = (unidad, cantidad) => {
+    if (unidad === 'Unidad') return cantidad === 1 ? 'Unidad' : 'Unidades'
+    return cantidad === 1 ? unidad : unidad + 's'
+  }
+
+  const confirmarBorrado = async () => {
+    if (!productoParaBorrar) return
+    try {
+      await axios.delete(`http://localhost:3001/products/${productoParaBorrar.id}`)
+      fetchProductos()
+      setExpandido(null)
+      setProductoParaBorrar(null)
+    } catch (err) {
+      alert("Error al borrar producto.")
+      console.error(err)
+    }
+  }
+
+  const confirmarModificacion = async () => {
+    const cantidad = parseFloat(cantidadEditar)
+    if (isNaN(cantidad) || cantidad <= 0) return alert("Cantidad inválida")
+    try {
+      await axios.post(`http://localhost:3001/products/update`, {
+        sku: productoParaEditar.sku,
+        cantidad
+      })
+      fetchProductos()
+      setProductoParaEditar(null)
+      setCantidadEditar('')
+    } catch (err) {
+      alert("Error al modificar cantidad.")
+      console.error(err)
+    }
+  }
+
+  const formatearUbicacion = (prod) => {
+    if (prod.tipoUbicacion === 'repisa' && prod.repisa && prod.estante) {
+      return `Repisa ${prod.repisa.letra} Estante ${prod.estante.numero}`
+    } else if (prod.ubicacionLibre) {
+      return prod.ubicacionLibre
+    }
+    return '—'
+  }
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Stock disponible</h2>
@@ -100,8 +136,8 @@ export default function Stock() {
         <select name="unidad" value={filtros.unidad} onChange={handleChange} className="input">
           <option value="">Todas las unidades</option>
           <option value="Unidad">Unidad</option>
-          <option value="Litros">Litros</option>
-          <option value="Metros">Metros</option>
+          <option value="Litro">Litro</option>
+          <option value="Metro">Metro</option>
           <option value="Paquete">Paquete</option>
         </select>
         <select name="repisa" value={filtros.repisa} onChange={handleChange} className="input">
@@ -124,11 +160,11 @@ export default function Stock() {
               <div>
                 <h3 className="font-semibold text-lg">{prod.descripcion}</h3>
                 <p className="text-sm text-gray-600">Marca: {prod.marca}</p>
-                <p className="text-sm">Cantidad: {prod.cantidad} {prod.unidad}</p>
-                <p className="text-sm">Ubicación: {prod.ubicacion}</p>
+                <p className="text-sm">Cantidad: {prod.cantidad} {pluralizar(prod.unidad, prod.cantidad)}</p>
+                <p className="text-sm">Ubicación: {formatearUbicacion(prod)}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <button onClick={() => toggleExpand(prod.id)} className="text-blue-500 text-sm hover:underline">
+                <button onClick={() => toggleExpand(prod.id)} className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">
                   {expandido === prod.id ? 'Ocultar detalles' : 'Ver detalles'}
                 </button>
                 <button onClick={() => abrirModalVenta(prod)} className="bg-green-500 text-white text-sm px-3 py-1 rounded hover:bg-green-600">
@@ -136,11 +172,24 @@ export default function Stock() {
                 </button>
               </div>
             </div>
+
             {expandido === prod.id && (
-              <div className="mt-2 text-sm text-gray-700">
+              <div className="mt-2 text-sm text-gray-700 border-t pt-3">
                 <p><strong>SKU:</strong> {prod.sku || 'N/A'}</p>
-                <p><strong>Estante:</strong> {prod.estante || '—'} / <strong>Repisa:</strong> {prod.repisa || '—'}</p>
+                <p><strong>Descripción:</strong> {prod.descripcion}</p>
+                <p><strong>Marca:</strong> {prod.marca}</p>
+                <p><strong>Ubicación:</strong> {formatearUbicacion(prod)}</p>
+                <p><strong>Cantidad:</strong> {prod.cantidad} {pluralizar(prod.unidad, prod.cantidad)}</p>
+                <p><strong>Unidad:</strong> {prod.unidad}</p>
                 <p><strong>Observaciones:</strong> {prod.observaciones || '—'}</p>
+                <div className="mt-4 flex justify-end gap-3">
+                  <button onClick={() => setProductoParaEditar(prod)} className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm">
+                    Agregar cantidad
+                  </button>
+                  <button onClick={() => setProductoParaBorrar(prod)} className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm">
+                    Borrar Producto
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -158,21 +207,50 @@ export default function Stock() {
           <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
             <h3 className="text-lg font-bold mb-2">Agregar a venta</h3>
             <p>{modal.descripcion}</p>
-            <p className="text-sm">Disponible: {modal.cantidad} {modal.unidad}</p>
+            <p className="text-sm">Disponible: {modal.cantidad} {pluralizar(modal.unidad, modal.cantidad)}</p>
             <input
               type="number"
               min="1"
               max={modal.cantidad}
               value={cantidadVenta}
-              onChange={e => {
-                const val = parseInt(e.target.value)
-                setCantidadVenta(Number.isNaN(val) ? 1 : val)
-              }}
+              onChange={e => setCantidadVenta(Number.isNaN(parseInt(e.target.value)) ? 1 : parseInt(e.target.value))}
               className="input mt-2 mb-4 w-full"
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setModal(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
               <button onClick={confirmarAgregarVenta} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Agregar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {productoParaBorrar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-2">¿Eliminar producto?</h3>
+            <p>¿Estás seguro que deseás eliminar este producto del inventario? Esta acción es irreversible.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setProductoParaBorrar(null)} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancelar</button>
+              <button onClick={confirmarBorrado} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {productoParaEditar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-2">Agregar cantidad</h3>
+            <p>Agregar unidades o litros al stock ({pluralizar(productoParaEditar.unidad, 2)})</p>
+            <input
+              type="number"
+              className="input mt-3 mb-4 w-full"
+              value={cantidadEditar}
+              onChange={e => setCantidadEditar(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setProductoParaEditar(null)} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancelar</button>
+              <button onClick={confirmarModificacion} className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Aceptar</button>
             </div>
           </div>
         </div>

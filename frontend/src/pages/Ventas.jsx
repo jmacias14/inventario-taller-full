@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useVentaStore } from '../store/ventaStore'
 import axios from 'axios'
+import { TrashIcon } from '@heroicons/react/24/solid' // Asegurate de tener Heroicons instalado
 
 export default function Ventas() {
   const { venta, quitarProducto, reiniciarVenta } = useVentaStore()
@@ -52,6 +53,11 @@ export default function Ventas() {
     }
   }
 
+  const pluralizar = (unidad, cantidad) => {
+    if (unidad === 'Unidad') return cantidad === 1 ? 'Unidad' : 'Unidades'
+    return cantidad === 1 ? unidad : unidad + 's'
+  }
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Venta actual</h2>
@@ -62,13 +68,22 @@ export default function Ventas() {
         <div className="grid gap-4">
           {venta.map((prod, i) => (
             <div key={i} className="p-4 border rounded bg-white shadow-sm flex justify-between">
-              <div>
-                <h3 className="font-semibold">{prod.descripcion}</h3>
-                <p>Marca: {prod.marca}</p>
-                <p>Cantidad: {prod.cantidadSeleccionada || prod.cantidad || 1} {prod.unidad}</p>
-                <p>Ubicación: {prod.ubicacion}</p>
+              <div className="space-y-1">
+                <h3 className="font-semibold text-lg">{prod.descripcion}</h3>
+                <p><strong>Marca:</strong> {prod.marca}</p>
+                <p><strong>SKU:</strong> {prod.sku || '—'}</p>
+                <p><strong>Cantidad:</strong> {prod.cantidadSeleccionada || prod.cantidad || 1} {pluralizar(prod.unidad, prod.cantidadSeleccionada || prod.cantidad || 1)}</p>
+                <p><strong>Unidad:</strong> {prod.unidad}</p>
+                <p><strong>Ubicación:</strong> {prod.ubicacion}</p>
+                <p><strong>Observaciones:</strong> {prod.observaciones || '—'}</p>
               </div>
-              <button onClick={() => quitarProducto(prod.id)} className="text-red-600 hover:underline">Quitar</button>
+              <button
+                onClick={() => quitarProducto(prod.id)}
+                className="text-red-600 hover:text-red-800"
+                title="Quitar producto"
+              >
+                <TrashIcon className="w-6 h-6" />
+              </button>
             </div>
           ))}
         </div>

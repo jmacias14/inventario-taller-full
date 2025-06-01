@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
   }
 })
 
-// Obtener historial de ventas
+// Obtener historial de ventas con todos los datos del producto
 router.get('/history', async (req, res) => {
   try {
     const ventas = await prisma.sale.findMany({
@@ -64,7 +64,12 @@ router.get('/history', async (req, res) => {
       include: {
         items: {
           include: {
-            product: true
+            product: {
+              include: {
+                repisa: true,
+                estante: true
+              }
+            }
           }
         }
       }
@@ -76,9 +81,16 @@ router.get('/history', async (req, res) => {
       comentarios: venta.comentarios,
       productos: venta.items.map((item) => ({
         id: item.product.id,
-        nombre: item.product.nombre,
+        descripcion: item.product.descripcion,
+        sku: item.product.sku,
+        unidad: item.product.unidad,
         cantidad: item.cantidad,
-        marca: item.product.marca
+        marca: item.product.marca,
+        observaciones: item.product.observaciones,
+        tipoUbicacion: item.product.tipoUbicacion,
+        ubicacionLibre: item.product.ubicacionLibre,
+        repisa: item.product.repisa,
+        estante: item.product.estante
       }))
     }))
 

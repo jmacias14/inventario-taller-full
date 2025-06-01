@@ -46,6 +46,11 @@ export default function HistorialVentas() {
     }
   };
 
+  const pluralizar = (unidad, cantidad) => {
+    if (unidad === "Unidad") return cantidad === 1 ? "Unidad" : "Unidades";
+    return cantidad === 1 ? unidad : unidad + "s";
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Historial de Ventas</h1>
@@ -85,6 +90,7 @@ export default function HistorialVentas() {
                 </button>
               </div>
             </div>
+
             {ventaSeleccionada === venta.id && (
               <div className="mt-3 text-sm">
                 <ul className="list-disc list-inside">
@@ -94,8 +100,7 @@ export default function HistorialVentas() {
                       className="cursor-pointer hover:underline"
                       onClick={() => fetchProductoDetalle(producto.id)}
                     >
-                      {producto.nombre} – {producto.cantidad} unidad/es –{" "}
-                      {producto.marca}
+                      {producto.cantidad} {pluralizar(producto.unidad, producto.cantidad)} – SKU ({producto.sku || "—"}) – {producto.descripcion}
                     </li>
                   ))}
                 </ul>
@@ -112,8 +117,13 @@ export default function HistorialVentas() {
             <p><strong>Descripción:</strong> {productoDetalle.descripcion}</p>
             <p><strong>Marca:</strong> {productoDetalle.marca}</p>
             <p><strong>SKU:</strong> {productoDetalle.sku || '—'}</p>
-            <p><strong>Ubicación:</strong> Repisa {productoDetalle.repisa} – Estante {productoDetalle.estante}</p>
-            <p><strong>Cantidad:</strong> {productoDetalle.cantidad} {productoDetalle.unidad}</p>
+            <p><strong>Ubicación:</strong> {
+              productoDetalle.tipoUbicacion === 'repisa'
+                ? `Repisa ${productoDetalle.repisa?.letra || '?'} – Estante ${productoDetalle.estante?.numero || '?'}`
+                : productoDetalle.ubicacionLibre || '—'
+            }</p>
+            <p><strong>Cantidad:</strong> {productoDetalle.cantidad} {pluralizar(productoDetalle.unidad, productoDetalle.cantidad)}</p>
+            <p><strong>Unidad:</strong> {productoDetalle.unidad}</p>
             <p><strong>Observaciones:</strong> {productoDetalle.observaciones || '—'}</p>
             <button
               onClick={() => setProductoDetalle(null)}
