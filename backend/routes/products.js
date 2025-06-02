@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
       },
       marca ? { marca: { contains: marca, mode: 'insensitive' } } : {},
       unidad ? { unidad: { equals: unidad } } : {},
-      estante ? { estante: { numero: { equals: estante } } } : {},
+      estante ? { estante: { numero: { equals: estante.toString() } } } : {},
       repisa ? { repisa: { letra: { equals: repisa } } } : {},
       minCantidad ? { cantidad: { gte: parseFloat(minCantidad) } } : {},
       maxCantidad ? { cantidad: { lte: parseFloat(maxCantidad) } } : {}
@@ -85,18 +85,26 @@ router.post('/add', async (req, res) => {
     let repisaId = null
     let estanteId = null
     let ubicacionLibre = null
+    let repisaLetra = null
+    let estanteNumero = null
 
     if (data.tipoUbicacion === 'repisa') {
-      const repisa = await prisma.repisa.findFirst({ where: { letra: data.repisa } })
+      if (!data.repisaLetra || !data.estanteNumero) {
+        return res.status(400).json({ error: 'Faltan datos de repisa o estante' })
+      }
+
+      const repisa = await prisma.repisa.findFirst({ where: { letra: data.repisaLetra } })
       if (!repisa) return res.status(400).json({ error: 'Repisa no encontrada' })
 
       const estante = await prisma.estante.findFirst({
-        where: { numero: data.estante, repisaId: repisa.id }
+        where: { numero: data.estanteNumero.toString(), repisaId: repisa.id }
       })
       if (!estante) return res.status(400).json({ error: 'Estante no encontrado en la repisa indicada' })
 
       repisaId = repisa.id
       estanteId = estante.id
+      repisaLetra = repisa.letra
+      estanteNumero = parseInt(data.estanteNumero)
     } else if (data.tipoUbicacion === 'otro') {
       if (!data.ubicacionLibre) return res.status(400).json({ error: 'Debe indicar una ubicación libre' })
       ubicacionLibre = data.ubicacionLibre
@@ -115,6 +123,8 @@ router.post('/add', async (req, res) => {
         tipoUbicacion: data.tipoUbicacion,
         repisaId,
         estanteId,
+        repisaLetra,
+        estanteNumero,
         ubicacionLibre
       }
     })
@@ -199,7 +209,7 @@ router.put('/:id/cantidad', async (req, res) => {
   }
 })
 
-// Eliminar producto por ID (versión segura)
+// Eliminar producto por ID
 router.delete('/:id', async (req, res) => {
   const id = parseInt(req.params.id)
   if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -227,7 +237,7 @@ router.delete('/delete-all', async (req, res) => {
   }
 })
 
-// ✅ Obtener producto por ID
+// Obtener producto por ID
 router.get('/:id', async (req, res) => {
   const id = parseInt(req.params.id)
   if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' })

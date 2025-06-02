@@ -8,26 +8,29 @@ datasource db {
 }
 
 model Producto {
-  id             Int           @id @default(autoincrement())
-  sku            String?       @unique
-  marca          String
-  descripcion    String
-  cantidad       Float
-  unidad         String
-  observaciones  String?
+  id               Int           @id @default(autoincrement())
+  sku              String?
+  marca            String
+  descripcion      String
+  cantidad         Float
+  unidad           String
+  observaciones    String?
 
-  tipoUbicacion  String        // "repisa" o "otro"
-  repisaId       Int?          
-  estanteId      Int?
-  ubicacionLibre String?
+  tipoUbicacion    String
+  repisaId         Int?
+  estanteId        Int?
+  ubicacionLibre   String?
 
-  repisa         Repisa?       @relation(fields: [repisaId], references: [id])
-  estante        Estante?      @relation(fields: [estanteId], references: [id])
+  repisaLetra      String?
+  estanteNumero    Int?
 
-  movimientos    Movimiento[]
-  saleItems      SaleItem[]
+  repisa           Repisa?       @relation(fields: [repisaId], references: [id])
+  estante          Estante?      @relation(fields: [estanteId], references: [id])
 
-  updatedAt      DateTime      @updatedAt @default(now())
+  movimientos      Movimiento[]
+  saleItems        SaleItem[]
+
+  updatedAt        DateTime      @updatedAt @default(now())
 }
 
 model Repisa {

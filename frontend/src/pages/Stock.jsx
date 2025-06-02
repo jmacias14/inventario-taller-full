@@ -1,41 +1,42 @@
-// src/pages/Stock.jsx
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useVentaStore } from '../store/ventaStore'
+import { useToast } from '../context/ToastContext'
+import { Search, ChevronRight, ChevronUp, Trash2, Plus, Minus, ShoppingCart } from 'lucide-react'
 
 export default function Stock() {
   const [productos, setProductos] = useState([])
-  const [filtros, setFiltros] = useState({
-    query: '', marca: '', unidad: '', minCantidad: '', maxCantidad: '', estante: '', repisa: ''
-  })
-  const [expandido, setExpandido] = useState(null)
+  const [query, setQuery] = useState('')
+  const [cantidadFiltro, setCantidadFiltro] = useState('')
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
-  const [ubicacionConfig, setUbicacionConfig] = useState({})
-  const [estantesDisponibles, setEstantesDisponibles] = useState([])
+  const [estructura, setEstructura] = useState({})
   const [modal, setModal] = useState(null)
+  const [expandido, setExpandido] = useState(null)
   const [cantidadVenta, setCantidadVenta] = useState(1)
-  const [productoParaBorrar, setProductoParaBorrar] = useState(null)
-  const [productoParaEditar, setProductoParaEditar] = useState(null)
-  const [cantidadEditar, setCantidadEditar] = useState('')
+  const [modificarStockModal, setModificarStockModal] = useState(null)
+  const [accionStock, setAccionStock] = useState('agregar')
+  const [cantidadStock, setCantidadStock] = useState('')
+  const [confirmarEliminarId, setConfirmarEliminarId] = useState(null)
+
   const { agregarProducto } = useVentaStore()
+  const { showToast } = useToast()
   const LIMITE = 50
 
   useEffect(() => {
-    fetch('/config/ubicacion.config.json')
-      .then(res => res.ok ? res.json() : Promise.reject('No se pudo cargar configuración'))
-      .then(setUbicacionConfig)
-      .catch(err => console.error(err))
+    axios.get('http://localhost:3001/estructura')
+      .then(res => setEstructura(res.data || {}))
+      .catch(err => {
+        console.error('Error al cargar estructura:', err)
+        showToast('Error al cargar estructura de ubicación', 'error')
+      })
   }, [])
-
-  useEffect(() => {
-    setEstantesDisponibles(filtros.repisa && ubicacionConfig[filtros.repisa] ? ubicacionConfig[filtros.repisa] : [])
-  }, [filtros.repisa, ubicacionConfig])
 
   const fetchProductos = async () => {
     try {
       const params = new URLSearchParams()
-      Object.entries(filtros).forEach(([key, val]) => val && params.append(key, val))
+      if (query) params.append('query', query)
+      if (cantidadFiltro) params.append('maxCantidad', cantidadFiltro)
       params.append('skip', (pagina - 1) * LIMITE)
       params.append('take', LIMITE)
 
@@ -45,27 +46,13 @@ export default function Stock() {
       setTotalPaginas(Math.max(1, Math.ceil((res.data.total || productosData.length) / LIMITE)))
     } catch (error) {
       console.error('Error al obtener productos:', error)
+      showToast('Error al obtener productos del servidor', 'error')
       setProductos([])
       setTotalPaginas(1)
     }
   }
 
-  useEffect(() => { fetchProductos() }, [pagina])
-
-  const handleChange = e => {
-    const { name, value } = e.target
-    setFiltros(prev => ({ ...prev, [name]: value, ...(name === 'repisa' ? { estante: '' } : {}) }))
-  }
-
-  const handleBuscar = e => {
-    e.preventDefault()
-    setPagina(1)
-    fetchProductos()
-  }
-
-  const toggleExpand = (id) => {
-    setExpandido(prev => prev === id ? null : id)
-  }
+  useEffect(() => { fetchProductos() }, [pagina, query, cantidadFiltro])
 
   const abrirModalVenta = (producto) => {
     setModal(producto)
@@ -77,117 +64,121 @@ export default function Stock() {
     if (cantidad > 0 && cantidad <= modal.cantidad) {
       agregarProducto({ ...modal, cantidadSeleccionada: cantidad })
       setModal(null)
+      showToast('Producto agregado a la venta', 'success')
     } else {
-      alert('Cantidad inválida')
+      showToast('Cantidad inválida', 'error')
     }
   }
 
-  const pluralizar = (unidad, cantidad) => {
-    if (unidad === 'Unidad') return cantidad === 1 ? 'Unidad' : 'Unidades'
-    return cantidad === 1 ? unidad : unidad + 's'
-  }
-
-  const confirmarBorrado = async () => {
-    if (!productoParaBorrar) return
+  const confirmarEliminarProducto = async () => {
     try {
-      await axios.delete(`http://localhost:3001/products/${productoParaBorrar.id}`)
+      await axios.delete(`http://localhost:3001/products/${confirmarEliminarId}`)
+      showToast('Producto eliminado correctamente', 'success')
+      setConfirmarEliminarId(null)
       fetchProductos()
-      setExpandido(null)
-      setProductoParaBorrar(null)
     } catch (err) {
-      alert("Error al borrar producto.")
       console.error(err)
+      showToast('Error al eliminar producto', 'error')
     }
   }
 
-  const confirmarModificacion = async () => {
-    const cantidad = parseFloat(cantidadEditar)
-    if (isNaN(cantidad) || cantidad <= 0) return alert("Cantidad inválida")
+  const abrirModificarStock = (producto) => {
+    setModificarStockModal(producto)
+    setCantidadStock('')
+    setAccionStock('agregar')
+  }
+
+  const confirmarModificarStock = async () => {
+    const cantidad = parseFloat(cantidadStock)
+    if (isNaN(cantidad) || cantidad <= 0) return showToast('Cantidad inválida', 'error')
+
+    const producto = modificarStockModal
+    if (accionStock === 'quitar' && cantidad > producto.cantidad) {
+      return showToast('No puedes quitar más de lo disponible', 'error')
+    }
+
     try {
-      await axios.post(`http://localhost:3001/products/update`, {
-        sku: productoParaEditar.sku,
-        cantidad
-      })
+      if (accionStock === 'agregar') {
+        await axios.post('http://localhost:3001/products/update', { sku: producto.sku, cantidad })
+      } else {
+        await axios.put(`http://localhost:3001/products/${producto.id}/cantidad`, {
+          cantidad: producto.cantidad - cantidad
+        })
+      }
+      showToast(`Stock ${accionStock === 'agregar' ? 'agregado' : 'quitado'} correctamente`, 'success')
+      setModificarStockModal(null)
       fetchProductos()
-      setProductoParaEditar(null)
-      setCantidadEditar('')
     } catch (err) {
-      alert("Error al modificar cantidad.")
       console.error(err)
+      showToast('Error al modificar stock', 'error')
     }
-  }
-
-  const formatearUbicacion = (prod) => {
-    if (prod.tipoUbicacion === 'repisa' && prod.repisa && prod.estante) {
-      return `Repisa ${prod.repisa.letra} Estante ${prod.estante.numero}`
-    } else if (prod.ubicacionLibre) {
-      return prod.ubicacionLibre
-    }
-    return '—'
   }
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Stock disponible</h2>
-
-      <form onSubmit={handleBuscar} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <input name="query" value={filtros.query} onChange={handleChange} placeholder="Buscar por texto..." className="input" />
-        <input name="marca" value={filtros.marca} onChange={handleChange} placeholder="Marca" className="input" />
-        <select name="unidad" value={filtros.unidad} onChange={handleChange} className="input">
-          <option value="">Todas las unidades</option>
-          <option value="Unidad">Unidad</option>
-          <option value="Litro">Litro</option>
-          <option value="Metro">Metro</option>
-          <option value="Paquete">Paquete</option>
-        </select>
-        <select name="repisa" value={filtros.repisa} onChange={handleChange} className="input">
-          <option value="">Seleccione repisa</option>
-          {Object.keys(ubicacionConfig).map(rep => <option key={rep} value={rep}>{rep}</option>)}
-        </select>
-        <select name="estante" value={filtros.estante} onChange={handleChange} className="input" disabled={!filtros.repisa}>
-          <option value="">Seleccione estante</option>
-          {estantesDisponibles.map(est => <option key={est} value={est}>{est}</option>)}
-        </select>
-        <input name="minCantidad" value={filtros.minCantidad} onChange={handleChange} placeholder="Mín. Cant." type="number" className="input" />
-        <input name="maxCantidad" value={filtros.maxCantidad} onChange={handleChange} placeholder="Máx. Cant." type="number" className="input" />
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 col-span-full md:col-span-1">Buscar</button>
-      </form>
+      <div className="mb-4 relative max-w-2xl mx-auto">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Buscar por código, marca o descripción"
+            className="block w-full rounded-lg border border-gray-300 py-3 pl-12 pr-4 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPagina(1)
+            }}
+          />
+          <Search className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
+        </div>
+        <div className="mt-4 w-1/2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por cantidad (menor o igual a):</label>
+          <input
+            type="number"
+            placeholder="Cantidad máxima"
+            className="block w-full rounded-lg border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
+            value={cantidadFiltro}
+            onChange={(e) => {
+              setCantidadFiltro(e.target.value)
+              setPagina(1)
+            }}
+          />
+        </div>
+      </div>
 
       <div className="grid gap-4">
         {productos.map(prod => (
-          <div key={prod.id} className="p-4 border rounded bg-white shadow-sm">
+          <div
+            key={prod.id}
+            className={`p-4 border rounded bg-white shadow-sm ${prod.cantidad <= 1 ? 'bg-red-100' : ''}`}
+          >
             <div className="flex justify-between items-center">
-              <div>
-                <h3 className="font-semibold text-lg">{prod.descripcion}</h3>
-                <p className="text-sm text-gray-600">Marca: {prod.marca}</p>
-                <p className="text-sm">Cantidad: {prod.cantidad} {pluralizar(prod.unidad, prod.cantidad)}</p>
-                <p className="text-sm">Ubicación: {formatearUbicacion(prod)}</p>
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => setExpandido(expandido === prod.id ? null : prod.id)}>
+                <div className="flex items-center justify-center h-full">
+                  {expandido === prod.id ? <ChevronUp size={20} /> : <ChevronRight size={20} />}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{prod.descripcion}</h3>
+                  <p className="text-sm text-gray-600">Marca: {prod.marca}</p>
+                  <p className="text-sm text-gray-600">Ubicación: {prod.ubicacionLibre || `${prod.repisa?.letra || ''} ${prod.estante?.numero || ''}`}</p>
+                </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <button onClick={() => toggleExpand(prod.id)} className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">
-                  {expandido === prod.id ? 'Ocultar detalles' : 'Ver detalles'}
-                </button>
-                <button onClick={() => abrirModalVenta(prod)} className="bg-green-500 text-white text-sm px-3 py-1 rounded hover:bg-green-600">
-                  Agregar a Venta
-                </button>
-              </div>
+              <button onClick={() => abrirModalVenta(prod)} className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700">
+                <ShoppingCart size={16} className="inline mr-1" /> Agregar a Venta
+              </button>
             </div>
 
             {expandido === prod.id && (
-              <div className="mt-2 text-sm text-gray-700 border-t pt-3">
-                <p><strong>SKU:</strong> {prod.sku || 'N/A'}</p>
-                <p><strong>Descripción:</strong> {prod.descripcion}</p>
-                <p><strong>Marca:</strong> {prod.marca}</p>
-                <p><strong>Ubicación:</strong> {formatearUbicacion(prod)}</p>
-                <p><strong>Cantidad:</strong> {prod.cantidad} {pluralizar(prod.unidad, prod.cantidad)}</p>
-                <p><strong>Unidad:</strong> {prod.unidad}</p>
+              <div className="mt-4 text-sm text-gray-700 space-y-1">
+                <p><strong>SKU:</strong> {prod.sku || '—'}</p>
+                <p><strong>Cantidad:</strong> {prod.cantidad} {prod.unidad}</p>
                 <p><strong>Observaciones:</strong> {prod.observaciones || '—'}</p>
-                <div className="mt-4 flex justify-end gap-3">
-                  <button onClick={() => setProductoParaEditar(prod)} className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm">
-                    Agregar cantidad
+                <p><strong>Última actualización:</strong> {new Date(prod.updatedAt).toLocaleString()}</p>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => abrirModificarStock(prod)} className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700">
+                    <Plus size={14} /> Modificar stock
                   </button>
-                  <button onClick={() => setProductoParaBorrar(prod)} className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm">
-                    Borrar Producto
+                  <button onClick={() => setConfirmarEliminarId(prod.id)} className="inline-flex items-center gap-1 rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">
+                    <Trash2 size={14} /> Borrar producto
                   </button>
                 </div>
               </div>
@@ -207,14 +198,17 @@ export default function Stock() {
           <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
             <h3 className="text-lg font-bold mb-2">Agregar a venta</h3>
             <p>{modal.descripcion}</p>
-            <p className="text-sm">Disponible: {modal.cantidad} {pluralizar(modal.unidad, modal.cantidad)}</p>
+            <p className="text-sm">Disponible: {modal.cantidad} {modal.unidad}</p>
             <input
               type="number"
               min="1"
               max={modal.cantidad}
               value={cantidadVenta}
-              onChange={e => setCantidadVenta(Number.isNaN(parseInt(e.target.value)) ? 1 : parseInt(e.target.value))}
-              className="input mt-2 mb-4 w-full"
+              onChange={e => {
+                const val = parseInt(e.target.value)
+                setCantidadVenta(Number.isNaN(val) ? 1 : val)
+              }}
+              className="input mt-2 mb-4 w-full border border-gray-300 rounded px-3 py-2"
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setModal(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
@@ -224,33 +218,41 @@ export default function Stock() {
         </div>
       )}
 
-      {productoParaBorrar && (
+      {confirmarEliminarId !== null && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-2">¿Eliminar producto?</h3>
-            <p>¿Estás seguro que deseás eliminar este producto del inventario? Esta acción es irreversible.</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setProductoParaBorrar(null)} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancelar</button>
-              <button onClick={confirmarBorrado} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Confirmar</button>
+            <h3 className="text-lg font-bold mb-4">¿Eliminar producto?</h3>
+            <p className="text-sm text-gray-700 mb-4">Esta acción es permanente y no se puede deshacer.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmarEliminarId(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
+              <button onClick={confirmarEliminarProducto} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Eliminar</button>
             </div>
           </div>
         </div>
       )}
 
-      {productoParaEditar && (
+      {modificarStockModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-2">Agregar cantidad</h3>
-            <p>Agregar unidades o litros al stock ({pluralizar(productoParaEditar.unidad, 2)})</p>
+            <h3 className="text-lg font-bold mb-4">Modificar stock</h3>
+            <div className="flex items-center gap-4 mb-3">
+              <label className="flex items-center gap-2">
+                <input type="radio" value="agregar" checked={accionStock === 'agregar'} onChange={() => setAccionStock('agregar')} /> Agregar
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" value="quitar" checked={accionStock === 'quitar'} onChange={() => setAccionStock('quitar')} /> Quitar
+              </label>
+            </div>
             <input
               type="number"
-              className="input mt-3 mb-4 w-full"
-              value={cantidadEditar}
-              onChange={e => setCantidadEditar(e.target.value)}
+              placeholder="Cantidad"
+              className="input w-full border border-gray-300 rounded px-3 py-2"
+              value={cantidadStock}
+              onChange={e => setCantidadStock(e.target.value)}
             />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setProductoParaEditar(null)} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancelar</button>
-              <button onClick={confirmarModificacion} className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Aceptar</button>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setModificarStockModal(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
+              <button onClick={confirmarModificarStock} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Confirmar</button>
             </div>
           </div>
         </div>

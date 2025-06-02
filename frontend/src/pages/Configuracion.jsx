@@ -7,11 +7,12 @@ export default function Configuracion() {
   const [letraRepisa, setLetraRepisa] = useState("");
   const [cantidadEstantes, setCantidadEstantes] = useState(1);
   const [repisas, setRepisas] = useState([]);
-  const [mostrarRepisas, setMostrarRepisas] = useState(false);
   const [editarId, setEditarId] = useState(null);
   const [nuevaCantidad, setNuevaCantidad] = useState(0);
   const [confirmarEliminarId, setConfirmarEliminarId] = useState(null);
   const [confirmarEditar, setConfirmarEditar] = useState(null);
+  const [archivoExcel, setArchivoExcel] = useState(null);
+  const [erroresImportacion, setErroresImportacion] = useState([]);
 
   const { showToast } = useContext(ToastContext);
 
@@ -89,164 +90,82 @@ export default function Configuracion() {
     }
   };
 
+  const handleExcelUpload = async () => {
+    if (!archivoExcel) return showToast("error", "❌ Seleccioná un archivo Excel primero.");
+
+    const formData = new FormData();
+    formData.append("file", archivoExcel);
+
+    try {
+      await axios.post("http://localhost:3001/importar", formData);
+      showToast("success", "✅ Productos importados correctamente.");
+      setErroresImportacion([]);
+    } catch (error) {
+      console.error("Error al importar productos", error);
+      const errores = error.response?.data?.errores || [];
+      setErroresImportacion(errores);
+      showToast("error", "❌ Hubo errores durante la importación.");
+    }
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Configuración</h1>
 
-      <div className="mb-6">
-        <button
-          onClick={() => setMostrarRepisas(!mostrarRepisas)}
-          className="inline-block rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Configuración Repisas
-        </button>
+      <div className="space-y-4">
+        <details className="group rounded-lg border border-gray-200 p-4 [&_summary::-webkit-details-marker]:hidden" open>
+          <summary className="flex cursor-pointer items-center justify-between gap-1.5 text-gray-900">
+            <h2 className="font-medium">Configuración Repisas</h2>
+            <svg className="h-5 w-5 shrink-0 transition duration-300 group-open:-rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+
+          <div className="mt-4 space-y-4">
+            <form onSubmit={handleSubmit} className="max-w-sm space-y-4">
+              <div>
+                <label className="block mb-1 font-semibold">Letra de la repisa:</label>
+                <input type="text" maxLength={1} required pattern="[A-Za-z]" value={letraRepisa} onChange={(e) => setLetraRepisa(e.target.value.toUpperCase())} className="w-full border rounded p-2" />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold">Cantidad de estantes:</label>
+                <input type="number" min={1} required value={cantidadEstantes} onChange={(e) => setCantidadEstantes(e.target.value.replace(/\D/, ""))} className="w-full border rounded p-2" />
+              </div>
+              <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Agregar repisa</button>
+            </form>
+          </div>
+        </details>
+
+        <details className="group rounded-lg border border-gray-200 p-4 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer items-center justify-between gap-1.5 text-gray-900">
+            <h2 className="font-medium">Importar desde Excel</h2>
+            <svg className="h-5 w-5 shrink-0 transition duration-300 group-open:-rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+
+          <div className="mt-4 flex flex-col md:flex-row md:items-center gap-4">
+            <input type="file" accept=".xlsx, .xls" onChange={(e) => setArchivoExcel(e.target.files[0])} className="text-sm text-gray-600" />
+            <button onClick={handleExcelUpload} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Importar Excel</button>
+          </div>
+        </details>
+
+        {erroresImportacion.length > 0 && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-lg max-w-md space-y-4">
+              <h2 className="text-lg font-semibold text-gray-800">Errores durante la importación</h2>
+              <ul className="list-disc list-inside text-sm text-red-600 max-h-64 overflow-y-auto">
+                {erroresImportacion.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+              <div className="flex justify-end">
+                <button onClick={() => setErroresImportacion([])} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {mostrarRepisas && (
-        <div className="space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
-            <div>
-              <label className="block font-semibold mb-1">Letra de la repisa:</label>
-              <input
-                type="text"
-                maxLength={1}
-                pattern="[A-Za-z]"
-                required
-                value={letraRepisa}
-                onChange={(e) => setLetraRepisa(e.target.value.toUpperCase())}
-                className="w-full border rounded p-2"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold mb-1">Cantidad de estantes:</label>
-              <input
-                type="number"
-                min={1}
-                required
-                value={cantidadEstantes}
-                onChange={(e) => setCantidadEstantes(e.target.value.replace(/\D/, ""))}
-                className="w-full border rounded p-2"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              Agregar repisa
-            </button>
-          </form>
-
-          <div>
-            <h2 className="text-lg font-bold mt-8 mb-2">Repisas existentes</h2>
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-              <table className="min-w-full divide-y-2 divide-gray-200 bg-white text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-900">Letra</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-900">Estantes</th>
-                    <th className="px-4 py-2 text-center font-medium text-gray-900">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {repisas.map((r) => (
-                    <tr key={r.id}>
-                      <td className="px-4 py-2 font-medium">{r.letra}</td>
-                      <td className="px-4 py-2">
-                        {editarId === r.id ? (
-                          <input
-                            type="number"
-                            min={r.estantes.length + 1}
-                            value={nuevaCantidad}
-                            onChange={(e) => setNuevaCantidad(e.target.value)}
-                            className="border rounded px-2 py-1 w-20"
-                          />
-                        ) : (
-                          r.estantes.length
-                        )}
-                      </td>
-                      <td className="px-4 py-2 flex items-center justify-center gap-2">
-                        {editarId === r.id ? (
-                          <>
-                            <CheckIcon
-                              onClick={() => setConfirmarEditar(r.id)}
-                              className="h-5 w-5 text-green-600 cursor-pointer hover:text-green-800"
-                            />
-                            <XMarkIcon
-                              onClick={() => setEditarId(null)}
-                              className="h-5 w-5 text-gray-500 cursor-pointer hover:text-gray-700"
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <PencilIcon
-                              onClick={() => handleEditarClick(r)}
-                              className="h-5 w-5 text-blue-600 cursor-pointer hover:text-blue-800"
-                            />
-                            <TrashIcon
-                              onClick={() => setConfirmarEliminarId(r.id)}
-                              className="h-5 w-5 text-red-600 cursor-pointer hover:text-red-800"
-                            />
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Confirmar Eliminación */}
-      {confirmarEliminarId && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded shadow-lg space-y-4 max-w-md">
-            <p className="text-lg font-semibold text-gray-800">¿Eliminar esta repisa?</p>
-            <div className="flex justify-end gap-4">
-              <button
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                onClick={() => handleEliminar(confirmarEliminarId)}
-              >
-                Sí, eliminar
-              </button>
-              <button
-                className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
-                onClick={() => setConfirmarEliminarId(null)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Confirmar Edición */}
-      {confirmarEditar && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded shadow-lg space-y-4 max-w-md">
-            <p className="text-lg font-semibold text-gray-800">
-              ¿Confirmás aumentar la cantidad de estantes?
-            </p>
-            <div className="flex justify-end gap-4">
-              <button
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                onClick={confirmarEdicion}
-              >
-                Confirmar
-              </button>
-              <button
-                className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
-                onClick={() => setConfirmarEditar(null)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
