@@ -48,7 +48,7 @@ async function generarProductos(cantidad) {
     };
 
     try {
-      const res = await axios.post("http://localhost:3001/products/add", producto);
+      const res = await api.post("http://localhost:3001/products/add", producto);
       console.log(`✓ Agregado: ${producto.descripcion} (SKU: ${producto.sku})`);
     } catch (err) {
       console.error(`✗ Error al agregar SKU ${producto.sku}:`, err.response?.data || err.message);

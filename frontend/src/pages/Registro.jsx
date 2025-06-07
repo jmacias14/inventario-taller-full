@@ -1,6 +1,6 @@
 // src/pages/Registro.jsx
 import { useEffect, useState } from 'react'
-import axios from 'axios'
+import { api } from '../api';
 import { ArrowDownCircle, ArrowUpCircle, XCircle } from 'lucide-react'
 
 export default function Registro() {
@@ -10,7 +10,7 @@ export default function Registro() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await axios.get('http://localhost:3001/logs')
+        const res = await api.get('http://localhost:3001/logs')
         setRegistros(res.data)
       } catch (err) {
         console.error('Error al cargar registros:', err)
@@ -22,8 +22,8 @@ export default function Registro() {
   const deshacerMovimiento = async (id) => {
     if (!window.confirm('¿Estás seguro que deseas deshacer este movimiento?')) return
     try {
-      await axios.post(`http://localhost:3001/logs/undo/${id}`)
-      const res = await axios.get('http://localhost:3001/logs')
+      await api.post(`http://localhost:3001/logs/undo/${id}`)
+      const res = await api.get('http://localhost:3001/logs')
       setRegistros(res.data)
       setHighlighted(id)
       setTimeout(() => setHighlighted(null), 3000)

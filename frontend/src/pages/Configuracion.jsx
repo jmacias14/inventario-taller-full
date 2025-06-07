@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { ToastContext } from "../context/ToastContext";
+import { api } from "../api";
 
 export default function Configuracion() {
   const [letraRepisa, setLetraRepisa] = useState("");
@@ -22,7 +23,7 @@ export default function Configuracion() {
 
   const obtenerRepisas = async () => {
     try {
-      const res = await axios.get("http://localhost:3001/config/repisa");
+      const res = await api.get("http://localhost:3001/config/repisa");
       setRepisas(res.data);
     } catch (err) {
       console.error("Error al cargar repisas", err);
@@ -34,7 +35,7 @@ export default function Configuracion() {
     e.preventDefault();
 
     try {
-      await axios.post("http://localhost:3001/config/repisa", {
+      await api.post("http://localhost:3001/config/repisa", {
         letra: letraRepisa.toUpperCase(),
         cantidadEstantes: parseInt(cantidadEstantes),
       });
@@ -65,7 +66,7 @@ export default function Configuracion() {
     }
 
     try {
-      await axios.put(`http://localhost:3001/config/repisa/${editarId}`, {
+      await api.put(`http://localhost:3001/config/repisa/${editarId}`, {
         nuevaCantidad: parseInt(nuevaCantidad),
       });
       setEditarId(null);
@@ -80,7 +81,7 @@ export default function Configuracion() {
 
   const handleEliminar = async (id) => {
     try {
-      await axios.delete(`http://localhost:3001/config/repisa/${id}`);
+      await api.delete(`http://localhost:3001/config/repisa/${id}`);
       showToast("success", "✅ Repisa eliminada correctamente.");
       setConfirmarEliminarId(null);
       obtenerRepisas();
@@ -97,7 +98,7 @@ export default function Configuracion() {
     formData.append("file", archivoExcel);
 
     try {
-      await axios.post("http://localhost:3001/importar", formData);
+      await api.post("http://localhost:3001/importar", formData);
       showToast("success", "✅ Productos importados correctamente.");
       setErroresImportacion([]);
     } catch (error) {

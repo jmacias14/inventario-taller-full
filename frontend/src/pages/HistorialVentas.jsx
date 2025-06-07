@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { api } from "../api";
 
 export default function HistorialVentas() {
   const [ventas, setVentas] = useState([]);
@@ -9,7 +10,7 @@ export default function HistorialVentas() {
 
   const fetchVentas = async () => {
     try {
-      const res = await axios.get("http://localhost:3001/sales/history");
+      const res = await api.get("http://localhost:3001/sales/history");
       setVentas(res.data);
     } catch (err) {
       console.error(err);
@@ -19,7 +20,7 @@ export default function HistorialVentas() {
 
   const fetchProductoDetalle = async (id) => {
     try {
-      const res = await axios.get(`http://localhost:3001/products/${id}`);
+      const res = await api.get(`http://localhost:3001/products/${id}`);
       setProductoDetalle(res.data);
     } catch (err) {
       console.error(err);
@@ -38,7 +39,7 @@ export default function HistorialVentas() {
   const anularVenta = async (id) => {
     if (!window.confirm("¿Anular esta venta y restaurar el stock?")) return;
     try {
-      await axios.delete(`http://localhost:3001/sales/${id}`);
+      await api.delete(`http://localhost:3001/sales/${id}`);
       await fetchVentas();
     } catch (err) {
       console.error(err);

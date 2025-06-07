@@ -10,10 +10,10 @@ import importarRoutes from './routes/importar.js'
 
 const app = express()
 
-// ✅ Permitir peticiones desde Vite
+// ✅ Permitir peticiones desde cualquier origen
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE']
 }))
 
 app.use(express.json())
@@ -24,6 +24,5 @@ app.use('/logs', logRoutes)
 app.use('/config', configRoutes)
 app.use('/estructura', estructuraRoutes)
 app.use('/importar', importarRoutes)
-
 
 app.listen(3001, () => console.log('API escuchando en http://localhost:3001'))

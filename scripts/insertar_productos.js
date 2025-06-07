@@ -227,7 +227,7 @@ const productos = [
 async function insertar() {
   for (const producto of productos) {
     try {
-      const res = await axios.post("http://localhost:3001/products/add", producto);
+      const res = await api.post("http://localhost:3001/products/add", producto);
       console.log("Agregado:", res.data.descripcion);
     } catch (err) {
       console.error("Error:", err.response?.data || err.message);

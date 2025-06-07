@@ -20,7 +20,7 @@ export default function AgregarAStockExistente({ volver }) {
   const buscarCoincidencias = async (texto) => {
     if (!texto || texto.length < 2) return setSugerencias([]);
     try {
-      const res = await axios.get("http://localhost:3001/products", {
+      const res = await api.get("http://localhost:3001/products", {
         params: { query: texto, take: 5 }
       });
       setSugerencias(res.data.productos || []);
@@ -51,7 +51,7 @@ export default function AgregarAStockExistente({ volver }) {
     }
 
     try {
-      await axios.post("http://localhost:3001/products/update", {
+      await api.post("http://localhost:3001/products/update", {
         sku: form.sku,
         cantidad: parseFloat(form.cantidad),
       });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import axios from 'axios'
+import { api } from '../api';
 import { useVentaStore } from '../store/ventaStore'
 import { useToast } from '../context/ToastContext'
 import { Search, ChevronRight, ChevronUp, Trash2, Plus, Minus, ShoppingCart } from 'lucide-react'
@@ -24,7 +24,7 @@ export default function Stock() {
   const LIMITE = 50
 
   useEffect(() => {
-    axios.get('http://localhost:3001/estructura')
+    api.get('http://localhost:3001/estructura')
       .then(res => setEstructura(res.data || {}))
       .catch(err => {
         console.error('Error al cargar estructura:', err)
@@ -40,7 +40,7 @@ export default function Stock() {
       params.append('skip', (pagina - 1) * LIMITE)
       params.append('take', LIMITE)
 
-      const res = await axios.get(`http://localhost:3001/products?${params.toString()}`)
+      const res = await api.get(`http://localhost:3001/products?${params.toString()}`)
       const productosData = Array.isArray(res.data) ? res.data : res.data.productos
       setProductos(productosData || [])
       setTotalPaginas(Math.max(1, Math.ceil((res.data.total || productosData.length) / LIMITE)))
@@ -72,7 +72,7 @@ export default function Stock() {
 
   const confirmarEliminarProducto = async () => {
     try {
-      await axios.delete(`http://localhost:3001/products/${confirmarEliminarId}`)
+      await api.delete(`http://localhost:3001/products/${confirmarEliminarId}`)
       showToast('Producto eliminado correctamente', 'success')
       setConfirmarEliminarId(null)
       fetchProductos()
@@ -99,9 +99,9 @@ export default function Stock() {
 
     try {
       if (accionStock === 'agregar') {
-        await axios.post('http://localhost:3001/products/update', { sku: producto.sku, cantidad })
+        await api.post('http://localhost:3001/products/update', { sku: producto.sku, cantidad })
       } else {
-        await axios.put(`http://localhost:3001/products/${producto.id}/cantidad`, {
+        await api.put(`http://localhost:3001/products/${producto.id}/cantidad`, {
           cantidad: producto.cantidad - cantidad
         })
       }

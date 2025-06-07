@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useVentaStore } from '../store/ventaStore'
-import axios from 'axios'
+import { api } from '../api';
 import { TrashIcon } from '@heroicons/react/24/solid' // Asegurate de tener Heroicons instalado
 
 export default function Ventas() {
@@ -28,7 +28,7 @@ export default function Ventas() {
         cantidad: p.cantidadSeleccionada || p.cantidad || 1
       }))
 
-      await axios.post('http://localhost:3001/sales', {
+      await api.post('http://localhost:3001/sales', {
         comentarios,
         productos
       })
