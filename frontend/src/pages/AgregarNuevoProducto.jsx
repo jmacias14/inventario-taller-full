@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { useToast } from "../context/ToastContext";
+import { api } from "../api.js";
 
 export default function AgregarNuevoProducto({ volver }) {
   const [form, setForm] = useState({
@@ -20,7 +20,7 @@ export default function AgregarNuevoProducto({ volver }) {
   const [estructura, setEstructura] = useState({});
 
   useEffect(() => {
-    api.get("http://localhost:3001/estructura")
+    api.get("/estructura")
       .then(res => setEstructura(res.data))
       .catch(() => showToast("❌ No se pudieron cargar las repisas", "error"));
   }, []);
@@ -49,7 +49,7 @@ export default function AgregarNuevoProducto({ volver }) {
     }
 
     try {
-      await api.post("http://localhost:3001/products/add", {
+      await api.post("/products/add", {
         descripcion: form.descripcion,
         marca: form.marca,
         sku: form.sku || null,

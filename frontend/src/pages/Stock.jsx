@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api';
+import { api } from "../api.js"
 import { useVentaStore } from '../store/ventaStore'
 import { useToast } from '../context/ToastContext'
-import { Search, ChevronRight, ChevronUp, Trash2, Plus, Minus, ShoppingCart } from 'lucide-react'
+import { Search, ChevronRight, ChevronUp, Trash2, Plus, ShoppingCart } from 'lucide-react'
 
 export default function Stock() {
   const [productos, setProductos] = useState([])
@@ -10,26 +10,36 @@ export default function Stock() {
   const [cantidadFiltro, setCantidadFiltro] = useState('')
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
-  const [estructura, setEstructura] = useState({})
+  const [estructuraRaw, setEstructuraRaw] = useState({})
+  const [estructura, setEstructura] = useState([])
   const [modal, setModal] = useState(null)
   const [expandido, setExpandido] = useState(null)
   const [cantidadVenta, setCantidadVenta] = useState(1)
-  const [modificarStockModal, setModificarStockModal] = useState(null)
-  const [accionStock, setAccionStock] = useState('agregar')
-  const [cantidadStock, setCantidadStock] = useState('')
   const [confirmarEliminarId, setConfirmarEliminarId] = useState(null)
+
+  const [productoEditar, setProductoEditar] = useState(null)
+  const [formEditar, setFormEditar] = useState({})
+  const [erroresEditar, setErroresEditar] = useState({})
+  const [confirmarStockMenor, setConfirmarStockMenor] = useState(false)
 
   const { agregarProducto } = useVentaStore()
   const { showToast } = useToast()
   const LIMITE = 50
 
   useEffect(() => {
-    api.get('http://localhost:3001/estructura')
-      .then(res => setEstructura(res.data || {}))
-      .catch(err => {
-        console.error('Error al cargar estructura:', err)
-        showToast('Error al cargar estructura de ubicación', 'error')
+    api.get('/estructura')
+      .then(res => {
+        const raw = res.data
+        setEstructuraRaw(raw)
+
+        // Convertimos el objeto { A: [1,2], B:[1,2,3] } a array [{ letra: 'A', estantes: [...] }]
+        const formateada = Object.entries(raw).map(([letra, estantes]) => ({
+          letra,
+          estantes: estantes.map((num, idx) => ({ id: `${letra}-${idx}`, numero: String(num) }))
+        }))
+        setEstructura(formateada)
       })
+      .catch(err => showToast('Error al cargar estructura de ubicación', 'error'))
   }, [])
 
   const fetchProductos = async () => {
@@ -40,12 +50,11 @@ export default function Stock() {
       params.append('skip', (pagina - 1) * LIMITE)
       params.append('take', LIMITE)
 
-      const res = await api.get(`http://localhost:3001/products?${params.toString()}`)
+      const res = await api.get(`/products?${params.toString()}`)
       const productosData = Array.isArray(res.data) ? res.data : res.data.productos
       setProductos(productosData || [])
       setTotalPaginas(Math.max(1, Math.ceil((res.data.total || productosData.length) / LIMITE)))
-    } catch (error) {
-      console.error('Error al obtener productos:', error)
+    } catch {
       showToast('Error al obtener productos del servidor', 'error')
       setProductos([])
       setTotalPaginas(1)
@@ -54,7 +63,7 @@ export default function Stock() {
 
   useEffect(() => { fetchProductos() }, [pagina, query, cantidadFiltro])
 
-  const abrirModalVenta = (producto) => {
+    const abrirModalVenta = (producto) => {
     setModal(producto)
     setCantidadVenta(1)
   }
@@ -70,51 +79,88 @@ export default function Stock() {
     }
   }
 
+  const abrirModalEditar = (producto) => {
+    const tipoUbicacion = producto.tipoUbicacion || (producto.ubicacionLibre ? 'otro' : 'repisa')
+    const repisaLetra = producto.repisa?.letra || ''
+    const estanteNumero = producto.estante?.numero || ''
+
+    setFormEditar({
+      ...producto,
+      tipoUbicacion,
+      repisaLetra,
+      estanteNumero,
+      ubicacionLibre: producto.ubicacionLibre || ''
+    })
+
+    setProductoEditar(producto)
+    setErroresEditar({})
+    setConfirmarStockMenor(false)
+  }
+
+  const handleTipoUbicacionChange = (tipo) => {
+    setFormEditar(prev => ({
+      ...prev,
+      tipoUbicacion: tipo,
+      repisaLetra: '',
+      estanteNumero: '',
+      ubicacionLibre: ''
+    }))
+  }
+
+  const validarFormularioEditar = async () => {
+    const camposObligatorios = ['sku', 'marca', 'descripcion', 'cantidad', 'unidad']
+    const nuevosErrores = {}
+    camposObligatorios.forEach(campo => {
+      if (!formEditar[campo] || String(formEditar[campo]).trim() === '') {
+        nuevosErrores[campo] = true
+      }
+    })
+
+    if (formEditar.sku !== productoEditar.sku) {
+      try {
+        const res = await api.get(`/products/sku/${formEditar.sku}`)
+        if (res.data) nuevosErrores.sku = 'SKU ya existente'
+      } catch {}
+    }
+
+    setErroresEditar(nuevosErrores)
+    return Object.keys(nuevosErrores).length === 0
+  }
+
+  const confirmarEdicionProducto = async () => {
+    const esValido = await validarFormularioEditar()
+    if (!esValido) return showToast('Corrige los errores antes de continuar', 'error')
+
+    const cantidadOriginal = productoEditar.cantidad
+    const nuevaCantidad = parseFloat(formEditar.cantidad)
+
+    if (!confirmarStockMenor && nuevaCantidad < cantidadOriginal) {
+      setConfirmarStockMenor(true)
+      return showToast('Estas eliminando productos del stock. Confirma nuevamente.', 'warning')
+    }
+
+    try {
+      await api.put(`/products/${productoEditar.id}`, formEditar)
+      showToast('Producto actualizado correctamente', 'success')
+      setProductoEditar(null)
+      fetchProductos()
+    } catch {
+      showToast('Error al guardar cambios', 'error')
+    }
+  }
+
   const confirmarEliminarProducto = async () => {
     try {
-      await api.delete(`http://localhost:3001/products/${confirmarEliminarId}`)
+      await api.delete(`/products/${confirmarEliminarId}`)
       showToast('Producto eliminado correctamente', 'success')
       setConfirmarEliminarId(null)
       fetchProductos()
-    } catch (err) {
-      console.error(err)
+    } catch {
       showToast('Error al eliminar producto', 'error')
     }
   }
 
-  const abrirModificarStock = (producto) => {
-    setModificarStockModal(producto)
-    setCantidadStock('')
-    setAccionStock('agregar')
-  }
-
-  const confirmarModificarStock = async () => {
-    const cantidad = parseFloat(cantidadStock)
-    if (isNaN(cantidad) || cantidad <= 0) return showToast('Cantidad inválida', 'error')
-
-    const producto = modificarStockModal
-    if (accionStock === 'quitar' && cantidad > producto.cantidad) {
-      return showToast('No puedes quitar más de lo disponible', 'error')
-    }
-
-    try {
-      if (accionStock === 'agregar') {
-        await api.post('http://localhost:3001/products/update', { sku: producto.sku, cantidad })
-      } else {
-        await api.put(`http://localhost:3001/products/${producto.id}/cantidad`, {
-          cantidad: producto.cantidad - cantidad
-        })
-      }
-      showToast(`Stock ${accionStock === 'agregar' ? 'agregado' : 'quitado'} correctamente`, 'success')
-      setModificarStockModal(null)
-      fetchProductos()
-    } catch (err) {
-      console.error(err)
-      showToast('Error al modificar stock', 'error')
-    }
-  }
-
-  return (
+    return (
     <div>
       <div className="mb-4 relative max-w-2xl mx-auto">
         <div className="relative">
@@ -147,10 +193,7 @@ export default function Stock() {
 
       <div className="grid gap-4">
         {productos.map(prod => (
-          <div
-            key={prod.id}
-            className={`p-4 border rounded bg-white shadow-sm ${prod.cantidad <= 1 ? 'bg-red-100' : ''}`}
-          >
+          <div key={prod.id} className={`p-4 border rounded bg-white shadow-sm ${prod.cantidad <= 1 ? 'bg-red-100' : ''}`}>
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2 cursor-pointer" onClick={() => setExpandido(expandido === prod.id ? null : prod.id)}>
                 <div className="flex items-center justify-center h-full">
@@ -174,8 +217,8 @@ export default function Stock() {
                 <p><strong>Observaciones:</strong> {prod.observaciones || '—'}</p>
                 <p><strong>Última actualización:</strong> {new Date(prod.updatedAt).toLocaleString()}</p>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => abrirModificarStock(prod)} className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700">
-                    <Plus size={14} /> Modificar stock
+                  <button onClick={() => abrirModalEditar(prod)} className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700">
+                    <Plus size={14} /> Editar producto
                   </button>
                   <button onClick={() => setConfirmarEliminarId(prod.id)} className="inline-flex items-center gap-1 rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">
                     <Trash2 size={14} /> Borrar producto
@@ -193,66 +236,82 @@ export default function Stock() {
         <button disabled={pagina === totalPaginas} onClick={() => setPagina(p => p + 1)} className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Siguiente</button>
       </div>
 
-      {modal && (
+      {productoEditar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-2">Agregar a venta</h3>
-            <p>{modal.descripcion}</p>
-            <p className="text-sm">Disponible: {modal.cantidad} {modal.unidad}</p>
-            <input
-              type="number"
-              min="1"
-              max={modal.cantidad}
-              value={cantidadVenta}
-              onChange={e => {
-                const val = parseInt(e.target.value)
-                setCantidadVenta(Number.isNaN(val) ? 1 : val)
-              }}
-              className="input mt-2 mb-4 w-full border border-gray-300 rounded px-3 py-2"
-            />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setModal(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
-              <button onClick={confirmarAgregarVenta} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Agregar</button>
-            </div>
-          </div>
-        </div>
-      )}
+          <div className="bg-white p-6 rounded shadow-lg max-w-md w-full overflow-y-auto max-h-[90vh]">
+            <h3 className="text-lg font-bold mb-4">Editar Producto</h3>
+            <div className="space-y-3">
+              {['sku','marca','descripcion','cantidad','unidad','observaciones'].map((campo, i) => (
+                <div key={i}>
+                  <label className="text-sm font-medium capitalize">{campo}</label>
+                  <input
+                    type={campo === 'cantidad' ? 'number' : 'text'}
+                    value={formEditar[campo] || ''}
+                    onChange={e => setFormEditar({ ...formEditar, [campo]: e.target.value })}
+                    className={`w-full border rounded px-3 py-2 ${erroresEditar[campo] ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {erroresEditar[campo] && typeof erroresEditar[campo] === 'string' && (
+                    <p className="text-xs text-red-600">{erroresEditar[campo]}</p>
+                  )}
+                </div>
+              ))}
 
-      {confirmarEliminarId !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-4">¿Eliminar producto?</h3>
-            <p className="text-sm text-gray-700 mb-4">Esta acción es permanente y no se puede deshacer.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmarEliminarId(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
-              <button onClick={confirmarEliminarProducto} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Eliminar</button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div>
+                <label className="text-sm font-medium block mb-1">Ubicación</label>
+                <select
+                  value={formEditar.tipoUbicacion}
+                  onChange={e => handleTipoUbicacionChange(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
+                >
+                  <option value="repisa">Repisa</option>
+                  <option value="otro">Ubicación libre</option>
+                </select>
 
-      {modificarStockModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-4">Modificar stock</h3>
-            <div className="flex items-center gap-4 mb-3">
-              <label className="flex items-center gap-2">
-                <input type="radio" value="agregar" checked={accionStock === 'agregar'} onChange={() => setAccionStock('agregar')} /> Agregar
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="radio" value="quitar" checked={accionStock === 'quitar'} onChange={() => setAccionStock('quitar')} /> Quitar
-              </label>
+                {formEditar.tipoUbicacion === 'repisa' && (
+                  <>
+                    <label className="text-sm">Repisa</label>
+                    <select
+                      value={formEditar.repisaLetra}
+                      onChange={e => setFormEditar(prev => ({ ...prev, repisaLetra: e.target.value, estanteNumero: '' }))}
+                      className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
+                    >
+                      <option value="">Seleccionar repisa</option>
+                      {estructura.map(r => (
+                        <option key={r.letra} value={r.letra}>{r.letra}</option>
+                      ))}
+                    </select>
+
+                    <label className="text-sm">Estante</label>
+                    <select
+                      value={formEditar.estanteNumero}
+                      onChange={e => setFormEditar(prev => ({ ...prev, estanteNumero: e.target.value }))}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    >
+                      <option value="">Seleccionar estante</option>
+                      {estructura.find(r => r.letra === formEditar.repisaLetra)?.estantes.map(est => (
+                        <option key={est.id} value={est.numero}>{est.numero}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+
+                {formEditar.tipoUbicacion === 'otro' && (
+                  <div className="mt-2">
+                    <label className="text-sm">Ubicación libre</label>
+                    <input
+                      type="text"
+                      value={formEditar.ubicacionLibre || ''}
+                      onChange={e => setFormEditar(prev => ({ ...prev, ubicacionLibre: e.target.value }))}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
-            <input
-              type="number"
-              placeholder="Cantidad"
-              className="input w-full border border-gray-300 rounded px-3 py-2"
-              value={cantidadStock}
-              onChange={e => setCantidadStock(e.target.value)}
-            />
+
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setModificarStockModal(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
-              <button onClick={confirmarModificarStock} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Confirmar</button>
+              <button onClick={() => setProductoEditar(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
+              <button onClick={confirmarEdicionProducto} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Aceptar cambios</button>
             </div>
           </div>
         </div>
@@ -260,3 +319,4 @@ export default function Stock() {
     </div>
   )
 }
+

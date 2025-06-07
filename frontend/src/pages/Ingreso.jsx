@@ -2,6 +2,8 @@
 import { useState } from "react";
 import AgregarNuevoProducto from "./AgregarNuevoProducto";
 import AgregarAStockExistente from "./AgregarAStockExistente";
+import { api } from "../api.js";
+
 
 export default function Ingreso() {
   const [modo, setModo] = useState(null);

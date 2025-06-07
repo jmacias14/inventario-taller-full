@@ -14,8 +14,7 @@ export default function Sidebar() {
     <aside className="flex h-screen w-64 flex-col justify-between border-r bg-white">
       <div className="px-4 py-6">
         <div className="mb-6">
-  <h2 className="text-lg font-bold text-gray-900">Jose Luis Perez</h2>
-  <p className="text-sm text-gray-500">Venta de Repuestos</p>
+        <img src="../logo.png" alt="" />
 </div>
 
 
@@ -37,7 +36,7 @@ export default function Sidebar() {
           </li>
           <li>
             <Link to="/ventas" className={linkClass("/ventas")}>
-              Ventas
+              Venta
             </Link>
           </li>
           <li>

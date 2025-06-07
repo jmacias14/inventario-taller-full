@@ -260,4 +260,99 @@ router.get('/:id', async (req, res) => {
   }
 })
 
+// ✅ Actualizar todos los datos del producto, incluyendo cantidad
+router.put('/:id', async (req, res) => {
+  const id = parseInt(req.params.id)
+  const {
+    descripcion, marca, sku, cantidad,
+    unidad, observaciones, tipoUbicacion,
+    repisaLetra, estanteNumero, ubicacionLibre
+  } = req.body
+
+  if (
+    isNaN(id) || !descripcion || !marca || !unidad || !tipoUbicacion ||
+    cantidad === undefined || isNaN(parseFloat(cantidad))
+  ) {
+    return res.status(400).json({ error: 'Datos inválidos o incompletos' })
+  }
+
+  try {
+    let repisaId = null
+    let estanteId = null
+    let ubicacion = null
+
+    if (tipoUbicacion === 'repisa') {
+      if (!repisaLetra || !estanteNumero) {
+        return res.status(400).json({ error: 'Faltan datos de repisa o estante' })
+      }
+
+      const repisa = await prisma.repisa.findFirst({ where: { letra: repisaLetra } })
+      if (!repisa) return res.status(400).json({ error: 'Repisa no encontrada' })
+
+      const estante = await prisma.estante.findFirst({
+        where: { numero: estanteNumero.toString(), repisaId: repisa.id }
+      })
+      if (!estante) return res.status(400).json({ error: 'Estante no encontrado en la repisa indicada' })
+
+      repisaId = repisa.id
+      estanteId = estante.id
+    } else if (tipoUbicacion === 'otro') {
+      if (!ubicacionLibre) {
+        return res.status(400).json({ error: 'Debe indicar ubicación libre' })
+      }
+      ubicacion = ubicacionLibre
+    }
+
+    const productoExistente = await prisma.producto.findUnique({ where: { id } })
+    if (!productoExistente) {
+      return res.status(404).json({ error: 'Producto no encontrado' })
+    }
+
+    // Verificar duplicado de SKU si cambió
+    if (sku && sku !== productoExistente.sku) {
+      const existente = await prisma.producto.findFirst({
+        where: { sku, NOT: { id } }
+      })
+      if (existente) {
+        return res.status(400).json({ error: 'El SKU ya existe en otro producto' })
+      }
+    }
+
+    const diferencia = parseFloat(cantidad) - productoExistente.cantidad
+
+    const actualizado = await prisma.producto.update({
+      where: { id },
+      data: {
+        descripcion,
+        marca,
+        sku: sku || null,
+        cantidad: parseFloat(cantidad),
+        unidad,
+        observaciones: observaciones || '',
+        tipoUbicacion,
+        repisaLetra: tipoUbicacion === 'repisa' ? repisaLetra : null,
+        estanteNumero: tipoUbicacion === 'repisa' ? parseInt(estanteNumero) : null,
+        ubicacionLibre: tipoUbicacion === 'otro' ? ubicacion : null,
+        repisaId,
+        estanteId
+      }
+    })
+
+    if (diferencia !== 0) {
+      await prisma.movimiento.create({
+        data: {
+          tipo: diferencia > 0 ? 'ajuste_positivo' : 'ajuste_negativo',
+          productoId: id,
+          cantidad: Math.abs(diferencia)
+        }
+      })
+    }
+
+    res.json(actualizado)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al actualizar producto' })
+  }
+})
+
 export default router

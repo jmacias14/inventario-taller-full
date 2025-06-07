@@ -8,12 +8,13 @@ export default defineConfig({
     host: '0.0.0.0',
     strictPort: true,
     hmr: {
-      clientPort: 443
+      host: 'localhost',
+      port: 5173
     },
     allowedHosts: [
       'localhost',
       '127.0.0.1',
-      'delivering-expenditures-signing-how.trycloudflare.com'
+      'soldiers-cakes-knee-characteristic.trycloudflare.com'
     ]
   }
 });

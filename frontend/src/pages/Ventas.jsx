@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useVentaStore } from '../store/ventaStore'
-import { api } from '../api';
+import { api } from "../api.js";
 import { TrashIcon } from '@heroicons/react/24/solid' // Asegurate de tener Heroicons instalado
 
 export default function Ventas() {
@@ -28,7 +28,7 @@ export default function Ventas() {
         cantidad: p.cantidadSeleccionada || p.cantidad || 1
       }))
 
-      await api.post('http://localhost:3001/sales', {
+      await api.post('/sales', {
         comentarios,
         productos
       })
@@ -60,8 +60,6 @@ export default function Ventas() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Venta actual</h2>
-
       {venta.length === 0 ? (
         <p>No hay productos en la venta.</p>
       ) : (
@@ -111,7 +109,7 @@ export default function Ventas() {
           Finalizar venta
         </button>
         <button onClick={handleReiniciar} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">
-          Reiniciar venta
+          Limpiar Venta
         </button>
       </div>
 

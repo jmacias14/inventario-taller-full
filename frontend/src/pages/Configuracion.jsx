@@ -1,8 +1,7 @@
 import { useEffect, useState, useContext } from "react";
-import axios from "axios";
 import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { ToastContext } from "../context/ToastContext";
-import { api } from "../api";
+import { api } from "../api.js";
 
 export default function Configuracion() {
   const [letraRepisa, setLetraRepisa] = useState("");
@@ -11,7 +10,6 @@ export default function Configuracion() {
   const [editarId, setEditarId] = useState(null);
   const [nuevaCantidad, setNuevaCantidad] = useState(0);
   const [confirmarEliminarId, setConfirmarEliminarId] = useState(null);
-  const [confirmarEditar, setConfirmarEditar] = useState(null);
   const [archivoExcel, setArchivoExcel] = useState(null);
   const [erroresImportacion, setErroresImportacion] = useState([]);
 
@@ -23,7 +21,7 @@ export default function Configuracion() {
 
   const obtenerRepisas = async () => {
     try {
-      const res = await api.get("http://localhost:3001/config/repisa");
+      const res = await api.get("/config/repisa");
       setRepisas(res.data);
     } catch (err) {
       console.error("Error al cargar repisas", err);
@@ -35,7 +33,7 @@ export default function Configuracion() {
     e.preventDefault();
 
     try {
-      await api.post("http://localhost:3001/config/repisa", {
+      await api.post("/config/repisa", {
         letra: letraRepisa.toUpperCase(),
         cantidadEstantes: parseInt(cantidadEstantes),
       });
@@ -66,11 +64,10 @@ export default function Configuracion() {
     }
 
     try {
-      await api.put(`http://localhost:3001/config/repisa/${editarId}`, {
+      await api.put(`/config/repisa/${editarId}`, {
         nuevaCantidad: parseInt(nuevaCantidad),
       });
       setEditarId(null);
-      setConfirmarEditar(null);
       showToast("success", "✅ Estantes actualizados correctamente.");
       obtenerRepisas();
     } catch (err) {
@@ -81,7 +78,7 @@ export default function Configuracion() {
 
   const handleEliminar = async (id) => {
     try {
-      await api.delete(`http://localhost:3001/config/repisa/${id}`);
+      await api.delete(`/config/repisa/${id}`);
       showToast("success", "✅ Repisa eliminada correctamente.");
       setConfirmarEliminarId(null);
       obtenerRepisas();
@@ -98,7 +95,11 @@ export default function Configuracion() {
     formData.append("file", archivoExcel);
 
     try {
-      await api.post("http://localhost:3001/importar", formData);
+      await api.post("/importar", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       showToast("success", "✅ Productos importados correctamente.");
       setErroresImportacion([]);
     } catch (error) {
@@ -134,6 +135,54 @@ export default function Configuracion() {
               </div>
               <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Agregar repisa</button>
             </form>
+
+            <div className="overflow-x-auto mt-6">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium text-gray-700">Letra</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-700">Estantes</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-700">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {repisas.map((repisa) => (
+                    <tr key={repisa.id}>
+                      <td className="px-4 py-2 font-mono font-semibold">{repisa.letra}</td>
+                      <td className="px-4 py-2">{repisa.estantes.length}</td>
+                      <td className="px-4 py-2 flex gap-2">
+                        {editarId === repisa.id ? (
+                          <>
+                            <input
+                              type="number"
+                              min={repisa.estantes.length + 1}
+                              value={nuevaCantidad}
+                              onChange={(e) => setNuevaCantidad(e.target.value)}
+                              className="w-20 border rounded p-1"
+                            />
+                            <button onClick={confirmarEdicion} className="bg-green-500 text-white rounded p-1">
+                              <CheckIcon className="h-5 w-5" />
+                            </button>
+                            <button onClick={() => setEditarId(null)} className="bg-gray-300 text-gray-800 rounded p-1">
+                              <XMarkIcon className="h-5 w-5" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => handleEditarClick(repisa)} className="bg-blue-500 text-white rounded p-1">
+                              <PencilIcon className="h-5 w-5" />
+                            </button>
+                            <button onClick={() => setConfirmarEliminarId(repisa.id)} className="bg-red-600 text-white rounded p-1">
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </details>
 
@@ -162,6 +211,29 @@ export default function Configuracion() {
               </ul>
               <div className="flex justify-end">
                 <button onClick={() => setErroresImportacion([])} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {confirmarEliminarId && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-lg space-y-4 max-w-sm text-center">
+              <h2 className="text-lg font-semibold">¿Eliminar esta repisa?</h2>
+              <p>Esta acción no se puede deshacer.</p>
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => handleEliminar(confirmarEliminarId)}
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                >
+                  Confirmar
+                </button>
+                <button
+                  onClick={() => setConfirmarEliminarId(null)}
+                  className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           </div>
